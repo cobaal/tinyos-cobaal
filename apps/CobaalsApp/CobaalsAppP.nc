@@ -102,10 +102,11 @@ implementation
   event void RadioControl.stopDone(error_t error) {}
 
   task void RF_Configuration_Setting() {
-    if (TOS_NODE_ID == 0 || TOS_NODE_ID == 41)
+    /* if (TOS_NODE_ID == 0 || TOS_NODE_ID == 41)
       call CC2420Config.setChannel(15);
     if (TOS_NODE_ID == 1 || TOS_NODE_ID == 40)
-      call CC2420Config.setChannel(11);
+      call CC2420Config.setChannel(11); */
+    call CC2420Config.setChannel(15);
     call CC2420Config.sync();
   }
 
