@@ -1,5 +1,0 @@
-COMPONENT=TestPhidgetAppC
-CFLAGS += -DPRINTFUART_ENABLED
-# CFLAGS += -DDEBUG_PHIDGET
-TINYOS_ROOT_DIR?=../../../..
-include $(TINYOS_ROOT_DIR)/Makefile.include
