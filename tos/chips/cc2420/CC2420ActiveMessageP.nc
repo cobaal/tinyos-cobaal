@@ -42,6 +42,7 @@
 
 #include <Ieee154.h>
 #include "CC2420.h"
+#include "CobaalsApp.h"
 
 module CC2420ActiveMessageP @safe() {
   provides {
@@ -70,6 +71,8 @@ module CC2420ActiveMessageP @safe() {
 implementation {
   uint16_t pending_length;
   message_t * ONE_NOK pending_message = NULL;
+  uint8_t forward_sequence = 0xff;
+  uint8_t feedback_sequence = 0xff;
   /***************** Resource event  ****************/
   event void RadioResource.granted() {
     uint8_t rc;
@@ -157,8 +160,40 @@ implementation {
   }
 
   command bool AMPacket.isForMe(message_t* amsg) {
-    return (call AMPacket.destination(amsg) == call AMPacket.address() ||
-	    call AMPacket.destination(amsg) == AM_BROADCAST_ADDR);
+    am_addr_t addr;
+    uint8_t *sequence;
+    uint64_t node_code = 1;
+    CobaalMsg* cobaalMsg;
+
+    addr = call AMPacket.destination(amsg);
+
+    if ((TOS_NODE_ID == PLANT_RX_NODE_ID && TOS_NODE_ID != addr) ||
+        (TOS_NODE_ID == CONTROLLER_RX_NODE_ID && TOS_NODE_ID != addr)) {
+      return 0;
+    }
+
+    if (addr == PLANT_RX_NODE_ID) {
+      sequence = &forward_sequence;
+
+    } else if (addr == CONTROLLER_RX_NODE_ID) {
+      sequence = &feedback_sequence;
+
+    } else {
+      return 0;
+    }
+
+    cobaalMsg = (CobaalMsg*)call Packet.getPayload(amsg, sizeof(CobaalMsg));;
+    node_code = node_code << TOS_NODE_ID;
+
+    if ((*sequence < cobaalMsg->sequence || (*sequence > 0xd0 && cobaalMsg->sequence < 0x20))
+              && (node_code & cobaalMsg->code) == node_code) {
+      // cobaalMsg->code = node_code ^ cobaalMsg->code;
+      *sequence = cobaalMsg->sequence;
+
+      return 1;
+    }
+
+    return 0;
   }
 
   command am_id_t AMPacket.type(message_t* amsg) {
@@ -219,10 +254,12 @@ implementation {
   event message_t* SubReceive.receive(message_t* msg, void* payload, uint8_t len) {
 
     if (call AMPacket.isForMe(msg)) {
+      call Leds.led1Toggle();
       return signal Receive.receive[call AMPacket.type(msg)](msg, payload, len);
     }
     else {
-      return signal Snoop.receive[call AMPacket.type(msg)](msg, payload, len);
+      call Leds.led2Toggle();
+      return msg;
     }
   }
 

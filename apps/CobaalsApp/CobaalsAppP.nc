@@ -28,15 +28,11 @@ module CobaalsAppP @safe() {
 
 implementation
 {
-  uint64_t node_code = 1;
-  uint8_t forward_sequence = 0xff;
-  uint8_t feedback_sequence = 0xff;
-
   enum {
     UART_QUEUE_LEN = 32,
     RADIO_QUEUE_LEN = 32,
   };
-
+  int sendcount = 0;
   message_t  uartQueueBufs[UART_QUEUE_LEN];
   message_t  * ONE_NOK uartQueue[UART_QUEUE_LEN];
   uint8_t    uartIn, uartOut;
@@ -61,11 +57,6 @@ implementation
 
   event void Boot.booted() {
     uint8_t i = 0;
-
-    while (i < TOS_NODE_ID) {
-      node_code = node_code * 2;
-      i++;
-    }
 
     for (i = 0; i < UART_QUEUE_LEN; i++)
       uartQueue[i] = &uartQueueBufs[i];
@@ -130,76 +121,43 @@ implementation
 
   message_t* receive(message_t *msg, void *payload, uint8_t len) {
     message_t *ret = msg;
-    am_addr_t addr;
 
     bool reflectToken = FALSE;
 
-    uint8_t *sequence;
-    CobaalMsg* cobaalMsg;
+    if (TOS_NODE_ID == PLANT_RX_NODE_ID || TOS_NODE_ID == CONTROLLER_RX_NODE_ID) {
+      // Radio to Serial
+      if (!uartFull) {
+        ret = uartQueue[uartIn];
+        uartQueue[uartIn] = msg;
 
-    atomic {
-      addr = call RadioAMPacket.destination(msg);
-      if ((TOS_NODE_ID == PLANT_RX_NODE_ID && TOS_NODE_ID != addr) ||
-          (TOS_NODE_ID == CONTROLLER_RX_NODE_ID && TOS_NODE_ID != addr)) {
-        return ret;
+        uartIn = (uartIn + 1) % UART_QUEUE_LEN;
+
+        if (uartIn == uartOut)
+        uartFull = TRUE;
+
+        if (!uartBusy) {
+          post uartSendTask();
+          uartBusy = TRUE;
+        }
       }
 
-      if (addr == PLANT_RX_NODE_ID) {
-        sequence = &forward_sequence;
+    } else {
+      // Radio to Radio
+      atomic {
+        if (!radioFull) {
+          reflectToken = TRUE;
+          ret = radioQueue[radioIn];
+          radioQueue[radioIn] = msg;
+          if (++radioIn >= RADIO_QUEUE_LEN)
+            radioIn = 0;
+          if (radioIn == radioOut)
+            radioFull = TRUE;
 
-      } else if (addr == CONTROLLER_RX_NODE_ID) {
-        sequence = &feedback_sequence;
-
-      } else {
-        return ret;
-      }
-
-      cobaalMsg = (CobaalMsg*)payload;
-
-      if ((*sequence < cobaalMsg->sequence || (*sequence > 0xd0 && cobaalMsg->sequence < 0x20))
-                && (node_code & cobaalMsg->code) == node_code) {
-        // cobaalMsg->code = node_code ^ cobaalMsg->code;
-        *sequence = cobaalMsg->sequence;
-
-        if (TOS_NODE_ID == PLANT_RX_NODE_ID || TOS_NODE_ID == CONTROLLER_RX_NODE_ID) {
-          // Radio to Serial
-          if (!uartFull) {
-            ret = uartQueue[uartIn];
-            uartQueue[uartIn] = msg;
-
-            uartIn = (uartIn + 1) % UART_QUEUE_LEN;
-
-            if (uartIn == uartOut)
-            uartFull = TRUE;
-
-            if (!uartBusy) {
-              post uartSendTask();
-              uartBusy = TRUE;
-            }
-          }
-
-        } else {
-          // Radio to Radio
-          atomic {
-            if (!radioFull) {
-              reflectToken = TRUE;
-              ret = radioQueue[radioIn];
-              radioQueue[radioIn] = msg;
-              if (++radioIn >= RADIO_QUEUE_LEN)
-                radioIn = 0;
-              if (radioIn == radioOut)
-                radioFull = TRUE;
-
-              if (!radioBusy) {
-                post radioSendTask();
-                radioBusy = TRUE;
-              }
-            }
+          if (!radioBusy) {
+            post radioSendTask();
+            radioBusy = TRUE;
           }
         }
-
-      } else {
-        return ret;
       }
     }
 
@@ -232,7 +190,7 @@ implementation
     call UartAMPacket.setGroup(msg, grp);
 
     if (call UartSend.send[id](addr, uartQueue[uartOut], len) == SUCCESS) {
-      call Leds.led1Toggle();
+      //call Leds.led1Toggle();
 
     } else {
       failBlink();
@@ -260,6 +218,9 @@ implementation
 						   uint8_t len) {
     message_t *ret = msg;
     bool reflectToken = FALSE;
+
+    sendcount++;
+    if (sendcount > 290) call Leds.led0Toggle();
 
     atomic
       if (!radioFull) {
@@ -307,9 +268,9 @@ implementation
     call RadioPacket.clear(msg);
     call RadioAMPacket.setSource(msg, source);
 
-    if (call RadioSend.send[id](addr, msg, len) == SUCCESS)
-      call Leds.led0Toggle();
-    else {
+    if (call RadioSend.send[id](addr, msg, len) == SUCCESS) {
+      //call Leds.led0Toggle();
+    } else {
 	    failBlink();
 	    post radioSendTask();
     }
