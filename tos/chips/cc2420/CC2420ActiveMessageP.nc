@@ -254,7 +254,7 @@ implementation {
   event message_t* SubReceive.receive(message_t* msg, void* payload, uint8_t len) {
 
     if (call AMPacket.isForMe(msg)) {
-      call Leds.led1Toggle();
+      call Leds.led0Toggle();
       return signal Receive.receive[call AMPacket.type(msg)](msg, payload, len);
     }
     else {

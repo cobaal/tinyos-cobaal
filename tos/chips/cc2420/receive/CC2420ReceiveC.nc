@@ -51,7 +51,7 @@ implementation {
   components CC2420PacketC;
   components new CC2420SpiC() as Spi;
   components CC2420ControlC;
-  
+
   components HplCC2420PinsC as Pins;
   components HplCC2420InterruptsC as InterruptsC;
 
@@ -64,7 +64,7 @@ implementation {
   PacketIndicator = CC2420ReceiveP.PacketIndicator;
 
   MainC.SoftwareInit -> CC2420ReceiveP;
-  
+
   CC2420ReceiveP.CSN -> Pins.CSN;
   CC2420ReceiveP.FIFO -> Pins.FIFO;
   CC2420ReceiveP.FIFOP -> Pins.FIFOP;

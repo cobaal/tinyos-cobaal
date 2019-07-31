@@ -1,4 +1,4 @@
-// #include "printf.h"
+/* #include "printf.h" */
 
 configuration CobaalsAppC {
 }
@@ -7,7 +7,9 @@ implementation {
   components ActiveMessageC as Radio, SerialActiveMessageC as Serial;
   components CC2420ActiveMessageC;
   components CC2420ControlC;
-  // components PrintfC;
+
+  components new TimerMilliC();
+  /* components PrintfC; */
 
   MainC.Boot <- CobaalsAppP;
 
@@ -29,4 +31,6 @@ implementation {
   CobaalsAppP.CC2420Config -> CC2420ControlC;
 
   CobaalsAppP.Leds -> LedsC;
+
+  CobaalsAppP.Timer -> TimerMilliC;
 }

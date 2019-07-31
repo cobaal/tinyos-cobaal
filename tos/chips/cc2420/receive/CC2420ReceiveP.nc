@@ -97,9 +97,9 @@ implementation {
   uint32_t m_timestamp_queue[ TIMESTAMP_QUEUE_SIZE ];
 
   uint8_t m_timestamp_head;
-  
+
   uint8_t m_timestamp_size;
-  
+
   /** Number of packets we missed because we were doing something else */
 #ifdef CC2420_HW_SECURITY
   norace uint8_t m_missed_packets;
@@ -109,12 +109,12 @@ implementation {
 
   /** TRUE if we are receiving a valid packet into the stack */
   bool receivingPacket;
-  
+
   /** The length of the frame we're currently receiving */
   norace uint8_t rxFrameLength;
-  
+
   norace uint8_t m_bytes_left;
-  
+
   norace message_t* ONE_NOK m_p_rx_buf;
 
   message_t m_rx_buf;
@@ -160,7 +160,7 @@ implementation {
       m_state = S_STARTED;
       atomic receivingPacket = FALSE;
       /* Note:
-         We use the falling edge because the FIFOP polarity is reversed. 
+         We use the falling edge because the FIFOP polarity is reversed.
          This is done in CC2420Power.startOscillator from CC2420ControlP.nc.
        */
       call InterruptFIFOP.enableFallingEdge();
@@ -185,7 +185,7 @@ implementation {
    */
   async command void CC2420Receive.sfd( uint32_t time ) {
     if ( m_timestamp_size < TIMESTAMP_QUEUE_SIZE ) {
-      uint8_t tail =  ( ( m_timestamp_head + m_timestamp_size ) % 
+      uint8_t tail =  ( ( m_timestamp_head + m_timestamp_size ) %
                         TIMESTAMP_QUEUE_SIZE );
       m_timestamp_queue[ tail ] = time;
       m_timestamp_size++;
@@ -206,8 +206,8 @@ implementation {
     }
     return receiving;
   }
-  
-  
+
+
   /***************** InterruptFIFOP Events ****************/
   async event void InterruptFIFOP.fired() {
     if ( m_state == S_STARTED ) {
@@ -446,7 +446,7 @@ implementation {
 	}
 
 	if(mode < 4 && mode > 0) { // if mode is valid
-  
+
 	  securityOn = 1;
 
 	  memcpy(&nonceValue[3], &(secHdr.frameCounter), 4);
@@ -521,7 +521,7 @@ implementation {
     receive();
 #endif
   }
-  
+
   /***************** RXFIFO Events ****************/
   /**
    * We received some bytes from the SPI bus.  Process them in the context
@@ -548,24 +548,24 @@ implementation {
            ) {
         // Length of this packet is bigger than the RXFIFO, flush it out.
         flush();
-        
+
       } else {
         if ( !call FIFO.get() && !call FIFOP.get() ) {
           m_bytes_left -= rxFrameLength + 1;
         }
-        
+
         if(rxFrameLength <= MAC_PACKET_SIZE) {
           if(rxFrameLength > 0) {
             if(rxFrameLength > SACK_HEADER_LENGTH) {
               // This packet has an FCF byte plus at least one more byte to read
               call RXFIFO.continueRead(buf + 1, SACK_HEADER_LENGTH);
-              
+
             } else {
               // This is really a bad packet, skip FCF and get it out of here.
               m_state = S_RX_PAYLOAD;
               call RXFIFO.continueRead(buf + 1, rxFrameLength);
             }
-                            
+
           } else {
             // Length == 0; start reading the next packet
             atomic receivingPacket = FALSE;
@@ -573,19 +573,19 @@ implementation {
             call SpiResource.release();
             waitForNextPacket();
           }
-          
+
         } else {
           // Length is too large; we have to flush the entire Rx FIFO
           flush();
         }
       }
       break;
-      
+
     case S_RX_FCF:
       m_state = S_RX_PAYLOAD;
-      
+
       /*
-       * The destination address check here is not completely optimized. If you 
+       * The destination address check here is not completely optimized. If you
        * are seeing issues with dropped acknowledgements, try removing
        * the address check and decreasing SACK_HEADER_LENGTH to 2.
        * The length byte and the FCF byte are the only two bytes required
@@ -610,7 +610,7 @@ implementation {
         }
       }
       // Didn't flip CSn, we're ok to continue reading.
-      call RXFIFO.continueRead(buf + 1 + SACK_HEADER_LENGTH, 
+      call RXFIFO.continueRead(buf + 1 + SACK_HEADER_LENGTH,
 			       rxFrameLength - SACK_HEADER_LENGTH);
       break;
 
@@ -621,7 +621,7 @@ implementation {
         // Release the SPI only if there are no more frames to download
         call SpiResource.release();
       }
-      
+
       //new packet is buffered up, or we don't have timestamp in fifo, or ack
       if ( ( m_missed_packets && call FIFO.get() ) || !call FIFOP.get()
             || !m_timestamp_size
@@ -651,7 +651,7 @@ implementation {
           return;
         }
       }
-      
+
       waitForNextPacket();
       break;
 
@@ -660,14 +660,14 @@ implementation {
       call CSN.set();
       call SpiResource.release();
       break;
-      
+
     }
-    
+
   }
 
   async event void RXFIFO.writeDone( uint8_t* tx_buf, uint8_t tx_len, error_t error ) {
-  }  
-  
+  }
+
   /***************** Tasks *****************/
   /**
    * Fill in metadata details, pass the packet up the stack, and
@@ -708,25 +708,25 @@ implementation {
   /****************** CC2420Config Events ****************/
   event void CC2420Config.syncDone( error_t error ) {
   }
-  
+
   /****************** Functions ****************/
   /**
    * Attempt to acquire the SPI bus to receive a packet.
    */
-  void beginReceive() { 
+  void beginReceive() {
     m_state = S_RX_LENGTH;
     atomic receivingPacket = TRUE;
     if(call SpiResource.isOwner()) {
       receive();
-      
+
     } else if (call SpiResource.immediateRequest() == SUCCESS) {
       receive();
-      
+
     } else {
       call SpiResource.request();
     }
   }
-  
+
   /**
    * Flush out the Rx FIFO
    */
@@ -749,11 +749,11 @@ implementation {
     call SpiResource.release();
     waitForNextPacket();
   }
-  
+
   /**
    * The first byte of each packet is the length byte.  Read in that single
    * byte, and then read in the rest of the packet.  The CC2420 could contain
-   * multiple packets that have been buffered up, so if something goes wrong, 
+   * multiple packets that have been buffered up, so if something goes wrong,
    * we necessarily want to flush out the FIFO unless we have to.
    */
   void receive() {
@@ -772,9 +772,9 @@ implementation {
         call SpiResource.release();
         return;
       }
-      
+
       atomic receivingPacket = FALSE;
-      
+
       /*
        * The FIFOP pin here is high when there are 0 bytes in the RX FIFO
        * and goes low as soon as there are bytes in the RX FIFO.  The pin
@@ -806,7 +806,7 @@ implementation {
       }
     }
   }
-  
+
   /**
    * Reset this component
    */
@@ -824,7 +824,7 @@ implementation {
   bool passesAddressCheck(message_t *msg) {
     cc2420_header_t *header = call CC2420PacketBody.getHeader( msg );
     int mode = (header->fcf >> IEEE154_FCF_DEST_ADDR_MODE) & 3;
-    ieee_eui64_t *ext_addr;  
+    ieee_eui64_t *ext_addr;
 
     if(!(call CC2420Config.isAddressRecognitionEnabled())) {
       return TRUE;
