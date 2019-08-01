@@ -78,7 +78,7 @@ implementation {
   components CC2420CsmaC as CsmaC;
   components CC2420ControlC;
   components CC2420PacketC;
-
+  
   SplitControl = Radio;
   RadioBackoff = AM;
   Packet = AM;
@@ -92,7 +92,7 @@ implementation {
   CC2420Packet = Radio;
   PacketAcknowledgements = Radio;
   LinkPacketMetadata = Radio;
-
+  
   // Radio resource for the AM layer
   AM.RadioResource -> Radio.Resource[CC2420_AM_SEND_ID];
   AM.SubSend -> Radio.ActiveSend;
@@ -102,7 +102,7 @@ implementation {
   AM.CC2420Packet -> CC2420PacketC;
   AM.CC2420PacketBody -> CC2420PacketC;
   AM.CC2420Config -> CC2420ControlC;
-
+  
   AM.SubBackoff -> CsmaC;
 
   components LedsC;

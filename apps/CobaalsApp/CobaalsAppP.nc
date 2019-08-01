@@ -23,43 +23,85 @@ module CobaalsAppP @safe() {
     interface CC2420Config;
 
     interface Leds;
-    interface Timer<TMilli>;
   }
 }
 
 implementation
 {
-  int sendcount = 0;
+  enum {
+    UART_QUEUE_LEN = 32,
+    RADIO_QUEUE_LEN = 32,
+  };
+  /* int sendcount = 0; */
+  int receivecount = 0;
+
+  message_t  uartQueueBufs[UART_QUEUE_LEN];
+  message_t  * ONE_NOK uartQueue[UART_QUEUE_LEN];
+  uint8_t    uartIn, uartOut;
+  bool       uartBusy, uartFull;
+
+  message_t  radioQueueBufs[RADIO_QUEUE_LEN];
+  message_t  * ONE_NOK radioQueue[RADIO_QUEUE_LEN];
+  uint8_t    radioIn, radioOut;
+  bool       radioBusy, radioFull;
+
+  task void uartSendTask();
+  task void radioSendTask();
+  task void RF_Configuration_Setting();
 
   void dropBlink() {
-    /* call Leds.led2Toggle(); */
+    call Leds.led2Toggle();
   }
 
   void failBlink() {
-    /* call Leds.led2Toggle(); */
+    call Leds.led2Toggle();
   }
 
   event void Boot.booted() {
-    if (call RadioControl.start() == EALREADY) {}
-    if (call SerialControl.start() == EALREADY) {}
+    uint8_t i = 0;
+
+    for (i = 0; i < UART_QUEUE_LEN; i++)
+      uartQueue[i] = &uartQueueBufs[i];
+    uartIn = uartOut = 0;
+    uartBusy = FALSE;
+    uartFull = TRUE;
+
+    for (i = 0; i < RADIO_QUEUE_LEN; i++)
+      radioQueue[i] = &radioQueueBufs[i];
+    radioIn = radioOut = 0;
+    radioBusy = FALSE;
+    radioFull = TRUE;
+
+    if (call RadioControl.start() == EALREADY)
+      radioFull = FALSE;
+    if (call SerialControl.start() == EALREADY)
+      uartFull = FALSE;
   }
 
   event void RadioControl.startDone(error_t error) {
     if (error == SUCCESS) {
-      /* call CC2420Config.setChannel(15);
-      call CC2420Config.sync(); */
+      radioFull = FALSE;
+      post RF_Configuration_Setting();
     }
   }
 
   event void SerialControl.startDone(error_t error) {
     if (error == SUCCESS) {
+      uartFull = FALSE;
     }
   }
 
   event void SerialControl.stopDone(error_t error) {}
   event void RadioControl.stopDone(error_t error) {}
 
+  task void RF_Configuration_Setting() {
+    call CC2420Config.setChannel(15);
+    call CC2420Config.sync();
+  }
+
   event void CC2420Config.syncDone(error_t error) {}
+
+  uint8_t count = 0;
 
   message_t* ONE receive(message_t* ONE msg, void* payload, uint8_t len);
 
@@ -77,85 +119,180 @@ implementation
 
   message_t* receive(message_t *msg, void *payload, uint8_t len) {
     message_t *ret = msg;
-    am_id_t id;
-    am_addr_t addr, src;
-    am_group_t grp;
+    CobaalMsg* cobaalMsg = (CobaalMsg*)payload;
+
+    bool reflectToken = FALSE;
 
     if (TOS_NODE_ID == PLANT_RX_NODE_ID || TOS_NODE_ID == CONTROLLER_RX_NODE_ID) {
       // Radio to Serial
-      atomic {
-        id = call RadioAMPacket.type(msg);
-        addr = call RadioAMPacket.destination(msg);
-        src = call RadioAMPacket.source(msg);
-        grp = call RadioAMPacket.group(msg);
+      if (!uartFull) {
+        ret = uartQueue[uartIn];
+        uartQueue[uartIn] = msg;
 
-        call UartPacket.clear(msg);
-        call UartAMPacket.setSource(msg, src);
-        call UartAMPacket.setGroup(msg, grp);
+        uartIn = (uartIn + 1) % UART_QUEUE_LEN;
 
-        call UartSend.send[id](addr, msg, len);
+        if (uartIn == uartOut)
+        uartFull = TRUE;
+
+        if (!uartBusy) {
+          post uartSendTask();
+          uartBusy = TRUE;
+        }
       }
 
     } else {
       // Radio to Radio
+      while (receivecount != cobaalMsg->sequence)
+          printf("[%d]\n",receivecount++);
+      printf("[%d] %u\n",receivecount++ , cobaalMsg->sequence);
+      printfflush();
+      
       atomic {
-        id = call RadioAMPacket.type(msg);
-        addr = call RadioAMPacket.destination(msg);
-        src = call RadioAMPacket.source(msg);
-        grp = call RadioAMPacket.group(msg);
+        if (!radioFull) {
+          reflectToken = TRUE;
+          ret = radioQueue[radioIn];
+          radioQueue[radioIn] = msg;
+          if (++radioIn >= RADIO_QUEUE_LEN)
+            radioIn = 0;
+          if (radioIn == radioOut)
+            radioFull = TRUE;
 
-        call RadioPacket.clear(msg);
-        call RadioAMPacket.setSource(msg, src);
-        call RadioAMPacket.setGroup(msg, grp);
-
-        call RadioSend.send[id](addr, msg, len);
+          if (!radioBusy) {
+            post radioSendTask();
+            radioBusy = TRUE;
+          }
+        }
       }
     }
 
     return ret;
   }
 
+  uint8_t tmpLen;
+
+  task void uartSendTask() {
+    uint8_t len;
+    am_id_t id;
+    am_addr_t addr, src;
+    message_t* msg;
+    am_group_t grp;
+    atomic {
+      if (uartIn == uartOut && !uartFull) {
+        uartBusy = FALSE;
+        return;
+      }
+    }
+
+    msg = uartQueue[uartOut];
+    tmpLen = len = call RadioPacket.payloadLength(msg);
+    id = call RadioAMPacket.type(msg);
+    addr = call RadioAMPacket.destination(msg);
+    src = call RadioAMPacket.source(msg);
+    grp = call RadioAMPacket.group(msg);
+    call UartPacket.clear(msg);
+    call UartAMPacket.setSource(msg, src);
+    call UartAMPacket.setGroup(msg, grp);
+
+    if (call UartSend.send[id](addr, uartQueue[uartOut], len) == SUCCESS) {
+      //call Leds.led1Toggle();
+
+    } else {
+      failBlink();
+      post uartSendTask();
+    }
+  }
+
   event void UartSend.sendDone[am_id_t id](message_t* msg, error_t error) {
     if (error != SUCCESS)
       failBlink();
+    else
+      atomic
+	if (msg == uartQueue[uartOut])
+	  {
+	    if (++uartOut >= UART_QUEUE_LEN)
+	      uartOut = 0;
+	    if (uartFull)
+	      uartFull = FALSE;
+	  }
+    post uartSendTask();
   }
 
   event message_t *UartReceive.receive[am_id_t id](message_t *msg,
 						   void *payload,
 						   uint8_t len) {
     message_t *ret = msg;
-    am_addr_t addr,source;
+    bool reflectToken = FALSE;
 
-    /* atomic {
-      sendcount++;
-      if (sendcount > 290) {
-        call Leds.led0Toggle();
-      }
-    } */
+    /* sendcount++;
+    if (sendcount > 190) call Leds.led0Toggle(); */
 
-    atomic {
-      addr = call UartAMPacket.destination(msg);
-      source = call UartAMPacket.source(msg);
+    atomic
+      if (!radioFull) {
+    	  reflectToken = TRUE;
+    	  ret = radioQueue[radioIn];
+    	  radioQueue[radioIn] = msg;
+    	  if (++radioIn >= RADIO_QUEUE_LEN)
+    	    radioIn = 0;
+    	  if (radioIn == radioOut)
+    	    radioFull = TRUE;
 
-      call RadioPacket.clear(msg);
-      call RadioAMPacket.setSource(msg, source);
+    	  if (!radioBusy) {
+  	      post radioSendTask();
+  	      radioBusy = TRUE;
+    	  }
+	    }
+      else
+	      dropBlink();
 
-      call RadioSend.send[id](addr, msg, len);
+    if (reflectToken) {
+      //call UartTokenReceive.ReflectToken(Token);
     }
 
     return ret;
   }
 
-  event void RadioSend.sendDone[am_id_t id](message_t* msg, error_t error) {
-    if (error != SUCCESS) {
-      failBlink();
+  task void radioSendTask() {
+    uint8_t len;
+    am_id_t id;
+    am_addr_t addr,source;
+    message_t* msg;
+
+    atomic
+      if (radioIn == radioOut && !radioFull) {
+    	  radioBusy = FALSE;
+    	  return;
+	    }
+
+    msg = radioQueue[radioOut];
+    len = call UartPacket.payloadLength(msg);
+    addr = call UartAMPacket.destination(msg);
+    source = call UartAMPacket.source(msg);
+    id = call UartAMPacket.type(msg);
+
+    call RadioPacket.clear(msg);
+    call RadioAMPacket.setSource(msg, source);
+
+    if (call RadioSend.send[id](addr, msg, len) == SUCCESS) {
+      //call Leds.led0Toggle();
     } else {
-      call RadioControl.stop();
-      call Timer.startOneShot(15);
+	    failBlink();
+	    post radioSendTask();
     }
   }
 
-  event void Timer.fired() {
-    call RadioControl.start();
+  event void RadioSend.sendDone[am_id_t id](message_t* msg, error_t error) {
+    if (error != SUCCESS)
+      failBlink();
+    else
+      atomic
+	if (msg == radioQueue[radioOut])
+	  {
+	    if (++radioOut >= RADIO_QUEUE_LEN)
+	      radioOut = 0;
+	    if (radioFull)
+	      radioFull = FALSE;
+	  }
+
+    post radioSendTask();
   }
 }
