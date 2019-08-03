@@ -184,9 +184,11 @@ implementation {
 
     cobaalMsg = (CobaalMsg*)call Packet.getPayload(amsg, sizeof(CobaalMsg));;
     node_code = node_code << TOS_NODE_ID;
-
-    if ((*sequence < cobaalMsg->sequence || (*sequence > 0xd0 && cobaalMsg->sequence < 0x20))
-              && (node_code & cobaalMsg->code) == node_code) {
+    atomic
+    /* if ((*sequence < cobaalMsg->sequence || (*sequence > 0xd0 && cobaalMsg->sequence < 0x20)) */
+      if (((*sequence < cobaalMsg->sequence && (cobaalMsg->sequence - *sequence) < 0x7e)
+          || (*sequence > cobaalMsg->sequence && (*sequence - cobaalMsg->sequence) > 0x7e))
+          && (node_code & cobaalMsg->code) == node_code) {
       // cobaalMsg->code = node_code ^ cobaalMsg->code;
       *sequence = cobaalMsg->sequence;
 
@@ -252,8 +254,7 @@ implementation {
 
   /***************** SubReceive Events ****************/
   event message_t* SubReceive.receive(message_t* msg, void* payload, uint8_t len) {
-
-    if (call AMPacket.isForMe(msg)) {
+    if (len >= 25 && call AMPacket.isForMe(msg)) {
       call Leds.led1Toggle();
       return signal Receive.receive[call AMPacket.type(msg)](msg, payload, len);
     }

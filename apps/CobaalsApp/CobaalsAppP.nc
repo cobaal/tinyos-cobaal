@@ -121,10 +121,10 @@ implementation
     message_t *ret = msg;
     CobaalMsg* cobaalMsg = (CobaalMsg*)payload;
 
-    bool reflectToken = FALSE;
-
     if (TOS_NODE_ID == PLANT_RX_NODE_ID || TOS_NODE_ID == CONTROLLER_RX_NODE_ID) {
       // Radio to Serial
+      printf("[%d] %u\r\n", receivecount++, cobaalMsg->sequence);
+      printfflush();
       if (!uartFull) {
         ret = uartQueue[uartIn];
         uartQueue[uartIn] = msg;
@@ -142,27 +142,25 @@ implementation
 
     } else {
       // Radio to Radio
-      while (receivecount != cobaalMsg->sequence)
-          printf("[%d]\n",receivecount++);
-      printf("[%d] %u\n",receivecount++ , cobaalMsg->sequence);
+      printf("[%d] %u\r\n", receivecount++, cobaalMsg->sequence);
       printfflush();
-      
-      atomic {
-        if (!radioFull) {
-          reflectToken = TRUE;
-          ret = radioQueue[radioIn];
-          radioQueue[radioIn] = msg;
-          if (++radioIn >= RADIO_QUEUE_LEN)
-            radioIn = 0;
-          if (radioIn == radioOut)
-            radioFull = TRUE;
 
-          if (!radioBusy) {
-            post radioSendTask();
-            radioBusy = TRUE;
-          }
-        }
-      }
+      atomic
+        if (!radioFull) {
+      	  ret = radioQueue[radioIn];
+      	  radioQueue[radioIn] = msg;
+      	  if (++radioIn >= RADIO_QUEUE_LEN)
+      	    radioIn = 0;
+      	  if (radioIn == radioOut)
+      	    radioFull = TRUE;
+
+      	  if (!radioBusy) {
+    	      post radioSendTask();
+    	      radioBusy = TRUE;
+      	  }
+  	    }
+        else
+  	      dropBlink();
     }
 
     return ret;
@@ -221,14 +219,12 @@ implementation
 						   void *payload,
 						   uint8_t len) {
     message_t *ret = msg;
-    bool reflectToken = FALSE;
 
     /* sendcount++;
     if (sendcount > 190) call Leds.led0Toggle(); */
 
     atomic
       if (!radioFull) {
-    	  reflectToken = TRUE;
     	  ret = radioQueue[radioIn];
     	  radioQueue[radioIn] = msg;
     	  if (++radioIn >= RADIO_QUEUE_LEN)
@@ -243,10 +239,6 @@ implementation
 	    }
       else
 	      dropBlink();
-
-    if (reflectToken) {
-      //call UartTokenReceive.ReflectToken(Token);
-    }
 
     return ret;
   }
@@ -264,16 +256,26 @@ implementation
 	    }
 
     msg = radioQueue[radioOut];
-    len = call UartPacket.payloadLength(msg);
-    addr = call UartAMPacket.destination(msg);
-    source = call UartAMPacket.source(msg);
-    id = call UartAMPacket.type(msg);
+
+    if (TOS_NODE_ID == PLANT_TX_NODE_ID || TOS_NODE_ID == CONTROLLER_TX_NODE_ID) {
+      len = call UartPacket.payloadLength(msg);
+      addr = call UartAMPacket.destination(msg);
+      source = call UartAMPacket.source(msg);
+      id = call UartAMPacket.type(msg);
+
+    } else {
+      len = call RadioPacket.payloadLength(msg);
+      addr = call RadioAMPacket.destination(msg);
+      source = call RadioAMPacket.source(msg);
+      id = call RadioAMPacket.type(msg);
+    }
 
     call RadioPacket.clear(msg);
     call RadioAMPacket.setSource(msg, source);
 
     if (call RadioSend.send[id](addr, msg, len) == SUCCESS) {
-      //call Leds.led0Toggle();
+      call Leds.led0Toggle();
+
     } else {
 	    failBlink();
 	    post radioSendTask();
