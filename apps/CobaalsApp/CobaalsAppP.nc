@@ -20,7 +20,6 @@ module CobaalsAppP @safe() {
     interface AMPacket as RadioAMPacket;
 
     interface CC2420Packet;
-    interface CC2420Config;
 
     interface Leds;
   }
@@ -47,7 +46,6 @@ implementation
 
   task void uartSendTask();
   task void radioSendTask();
-  task void RF_Configuration_Setting();
 
   void dropBlink() {
     call Leds.led2Toggle();
@@ -81,7 +79,6 @@ implementation
   event void RadioControl.startDone(error_t error) {
     if (error == SUCCESS) {
       radioFull = FALSE;
-      post RF_Configuration_Setting();
     }
   }
 
@@ -93,13 +90,6 @@ implementation
 
   event void SerialControl.stopDone(error_t error) {}
   event void RadioControl.stopDone(error_t error) {}
-
-  task void RF_Configuration_Setting() {
-    call CC2420Config.setChannel(15);
-    call CC2420Config.sync();
-  }
-
-  event void CC2420Config.syncDone(error_t error) {}
 
   uint8_t count = 0;
 
@@ -123,8 +113,8 @@ implementation
 
     if (TOS_NODE_ID == PLANT_RX_NODE_ID || TOS_NODE_ID == CONTROLLER_RX_NODE_ID) {
       // Radio to Serial
-      printf("[%d] %u\r\n", receivecount++, cobaalMsg->sequence);
-      printfflush();
+      /* printf("[%d] %u\r\n", receivecount++, cobaalMsg->sequence);
+      printfflush(); */
       if (!uartFull) {
         ret = uartQueue[uartIn];
         uartQueue[uartIn] = msg;
@@ -287,13 +277,12 @@ implementation
       failBlink();
     else
       atomic
-	if (msg == radioQueue[radioOut])
-	  {
-	    if (++radioOut >= RADIO_QUEUE_LEN)
-	      radioOut = 0;
-	    if (radioFull)
-	      radioFull = FALSE;
-	  }
+	      if (msg == radioQueue[radioOut]) {
+    	    if (++radioOut >= RADIO_QUEUE_LEN)
+    	      radioOut = 0;
+    	    if (radioFull)
+    	      radioFull = FALSE;
+	     }
 
     post radioSendTask();
   }

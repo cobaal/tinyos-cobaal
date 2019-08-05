@@ -168,7 +168,9 @@ implementation {
     addr = call AMPacket.destination(amsg);
 
     if ((TOS_NODE_ID == PLANT_RX_NODE_ID && TOS_NODE_ID != addr) ||
-        (TOS_NODE_ID == CONTROLLER_RX_NODE_ID && TOS_NODE_ID != addr)) {
+        (TOS_NODE_ID == CONTROLLER_RX_NODE_ID && TOS_NODE_ID != addr) ||
+        (TOS_NODE_ID == PLANT_TX_NODE_ID) ||
+        (TOS_NODE_ID == CONTROLLER_TX_NODE_ID)) {
       return 0;
     }
 

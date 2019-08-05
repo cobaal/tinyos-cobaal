@@ -7,7 +7,6 @@ implementation {
   components MainC, CobaalsAppP, LedsC;
   components ActiveMessageC as Radio, SerialActiveMessageC as Serial;
   components CC2420ActiveMessageC;
-  components CC2420ControlC;
   components PrintfC;
   components SerialStartC;
 
@@ -28,7 +27,6 @@ implementation {
   CobaalsAppP.RadioAMPacket -> Radio;
 
   CobaalsAppP.CC2420Packet -> CC2420ActiveMessageC;
-  CobaalsAppP.CC2420Config -> CC2420ControlC;
 
   CobaalsAppP.Leds -> LedsC;
 }
