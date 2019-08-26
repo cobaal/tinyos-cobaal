@@ -124,6 +124,11 @@ implementation {
     cc2420_header_t* header = call CC2420PacketBody.getHeader( p_msg );
     cc2420_metadata_t* metadata = call CC2420PacketBody.getMetadata( p_msg );
 
+    if (call Resource.immediateRequest() == SUCCESS) {
+      call CC2420Power.rxOn();
+      call Resource.release();
+    }
+
     atomic {
       if (!call SplitControlState.isState(S_STARTED)) {
         return FAIL;
@@ -252,12 +257,21 @@ implementation {
       call SplitControlState.forceState(S_STARTED);
     }
 
+    if (call Resource.immediateRequest() == SUCCESS) {
+      call CC2420Power.rfOff();
+      call Resource.release();
+    }
+
     signal Send.sendDone( m_msg, packetErr );
   }
 
   task void startDone_task() {
     call SubControl.start();
-    call CC2420Power.rxOn();
+
+    if (TOS_NODE_ID != CONTROLLER_TX_NODE_ID && TOS_NODE_ID != PLANT_TX_NODE_ID) {
+      call CC2420Power.rxOn();
+    }
+
     call Resource.release();
     call SplitControlState.forceState(S_STARTED);
     signal SplitControl.startDone( SUCCESS );

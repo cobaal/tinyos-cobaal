@@ -31,7 +31,7 @@ implementation
     UART_QUEUE_LEN = 32,
     RADIO_QUEUE_LEN = 32,
   };
-  /* int sendcount = 0; */
+  int sendcount = 0;
   int receivecount = 0;
 
   message_t  uartQueueBufs[UART_QUEUE_LEN];
@@ -132,8 +132,8 @@ implementation
 
     } else {
       // Radio to Radio
-      printf("[%d] %u\r\n", receivecount++, cobaalMsg->sequence);
-      printfflush();
+      /* printf("[%d] %u\r\n", receivecount++, cobaalMsg->sequence);
+      printfflush(); */
 
       atomic
         if (!radioFull) {
@@ -209,9 +209,13 @@ implementation
 						   void *payload,
 						   uint8_t len) {
     message_t *ret = msg;
-
-    /* sendcount++;
-    if (sendcount > 190) call Leds.led0Toggle(); */
+    /* atomic {
+    sendcount++;
+    if (sendcount > 190)
+      call Leds.led1Toggle();
+} */
+    /* printf("test");
+    printfflush(); */
 
     atomic
       if (!radioFull) {

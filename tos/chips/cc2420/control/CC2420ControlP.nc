@@ -70,7 +70,7 @@ module CC2420ControlP @safe() {
   uses interface CC2420Strobe as SRFOFF;
   uses interface CC2420Strobe as SXOSCOFF;
   uses interface CC2420Strobe as SXOSCON;
-  
+
   uses interface Resource as SpiResource;
   uses interface Resource as RssiResource;
   uses interface Resource as SyncResource;
@@ -90,31 +90,31 @@ implementation {
   } cc2420_control_state_t;
 
   uint8_t m_channel;
-  
+
   uint8_t m_tx_power;
-  
+
   uint16_t m_pan;
-  
+
   uint16_t m_short_addr;
 
   ieee_eui64_t m_ext_addr;
-  
+
   bool m_sync_busy;
-  
+
   /** TRUE if acknowledgments are enabled */
   bool autoAckEnabled;
-  
+
   /** TRUE if acknowledgments are generated in hardware only */
   bool hwAutoAckDefault;
-  
+
   /** TRUE if software or hardware address recognition is enabled */
   bool addressRecognition;
-  
+
   /** TRUE if address recognition should also be performed in hardware */
   bool hwAddressRecognition;
-  
+
   norace cc2420_control_state_t m_state = S_VREG_STOPPED;
-  
+
   /***************** Prototypes ****************/
 
   void writeFsctrl();
@@ -124,20 +124,20 @@ implementation {
 
   task void sync();
   task void syncDone();
-    
+
   /***************** Init Commands ****************/
   command error_t Init.init() {
     int i, t;
     call CSN.makeOutput();
     call RSTN.makeOutput();
     call VREN.makeOutput();
-    
+
     m_short_addr = call ActiveMessageAddress.amAddress();
     m_ext_addr = call LocalIeeeEui64.getId();
     m_pan = call ActiveMessageAddress.amGroup();
     m_tx_power = CC2420_DEF_RFPOWER;
     m_channel = CC2420_DEF_CHANNEL;
-    
+
     m_ext_addr = call LocalIeeeEui64.getId();
     for (i = 0; i < 4; i++) {
       t = m_ext_addr.data[i];
@@ -151,28 +151,28 @@ implementation {
 #else
     addressRecognition = TRUE;
 #endif
-    
+
 #if defined(CC2420_HW_ADDRESS_RECOGNITION)
     hwAddressRecognition = TRUE;
 #else
     hwAddressRecognition = FALSE;
 #endif
-    
-    
+
+
 #if defined(CC2420_NO_ACKNOWLEDGEMENTS)
     autoAckEnabled = FALSE;
 #else
     autoAckEnabled = TRUE;
 #endif
-    
+
 #if defined(CC2420_HW_ACKNOWLEDGEMENTS)
     hwAutoAckDefault = TRUE;
     hwAddressRecognition = TRUE;
 #else
     hwAutoAckDefault = FALSE;
 #endif
-    
-    
+
+
     return SUCCESS;
   }
 
@@ -226,20 +226,20 @@ implementation {
       if ( m_state != S_VREG_STARTED ) {
         return FAIL;
       }
-        
+
       m_state = S_XOSC_STARTING;
-      call IOCFG1.write( CC2420_SFDMUX_XOSC16M_STABLE << 
+      call IOCFG1.write( CC2420_SFDMUX_XOSC16M_STABLE <<
                          CC2420_IOCFG1_CCAMUX );
-                         
+
       call InterruptCCA.enableRisingEdge();
       call SXOSCON.strobe();
-      
+
       call IOCFG0.write( ( 1 << CC2420_IOCFG0_FIFOP_POLARITY ) |
           ( 127 << CC2420_IOCFG0_FIFOP_THR ) );
-                         
+
       writeFsctrl();
       writeMdmctrl0();
-  
+
       call RXCTRL1.write( ( 1 << CC2420_RXCTRL1_RXBPF_LOCUR ) |
           ( 1 << CC2420_RXCTRL1_LOW_LOWGAIN ) |
           ( 1 << CC2420_RXCTRL1_HIGH_HGM ) |
@@ -276,7 +276,7 @@ implementation {
   }
 
   async command error_t CC2420Power.rfOff() {
-    atomic {  
+    atomic {
       if ( m_state != S_XOSC_STARTED ) {
         return FAIL;
       }
@@ -285,7 +285,7 @@ implementation {
     return SUCCESS;
   }
 
-  
+
   /***************** CC2420Config Commands ****************/
   command uint8_t CC2420Config.getChannel() {
     atomic return m_channel;
@@ -325,7 +325,7 @@ implementation {
       if ( m_sync_busy ) {
         return FAIL;
       }
-      
+
       m_sync_busy = TRUE;
       if ( m_state == S_XOSC_STARTED ) {
         call SyncResource.request();
@@ -348,22 +348,22 @@ implementation {
       hwAddressRecognition = useHwAddressRecognition;
     }
   }
-  
+
   /**
    * @return TRUE if address recognition is enabled
    */
   async command bool CC2420Config.isAddressRecognitionEnabled() {
     atomic return addressRecognition;
   }
-  
+
   /**
    * @return TRUE if address recognition is performed first in hardware.
    */
   async command bool CC2420Config.isHwAddressRecognitionDefault() {
     atomic return hwAddressRecognition;
   }
-  
-  
+
+
   /**
    * Sync must be called for acknowledgement changes to take effect
    * @param enableAutoAck TRUE to enable auto acknowledgements
@@ -374,27 +374,27 @@ implementation {
     atomic autoAckEnabled = enableAutoAck;
     atomic hwAutoAckDefault = hwAutoAck;
   }
-  
+
   /**
    * @return TRUE if hardware auto acks are the default, FALSE if software
    *     acks are the default
    */
   async command bool CC2420Config.isHwAutoAckDefault() {
-    atomic return hwAutoAckDefault;    
+    atomic return hwAutoAckDefault;
   }
-  
+
   /**
    * @return TRUE if auto acks are enabled
    */
   async command bool CC2420Config.isAutoAckEnabled() {
     atomic return autoAckEnabled;
   }
-  
+
   /***************** ReadRssi Commands ****************/
-  command error_t ReadRssi.read() { 
+  command error_t ReadRssi.read() {
     return call RssiResource.request();
   }
-  
+
   /***************** Spi Resources Events ****************/
   event void SyncResource.granted() {
     call CSN.clr();
@@ -415,18 +415,18 @@ implementation {
     signal Resource.granted();
   }
 
-  event void RssiResource.granted() { 
+  event void RssiResource.granted() {
     uint16_t data = 0;
     call CSN.clr();
     call RSSI.read(&data);
     call CSN.set();
-    
+
     call RssiResource.release();
     data += 0x7f;
     data &= 0x00ff;
-    signal ReadRssi.readDone(SUCCESS, data); 
+    signal ReadRssi.readDone(SUCCESS, data);
   }
-  
+
   /***************** StartupTimer Events ****************/
   async event void StartupTimer.fired() {
     if ( m_state == S_VREG_STARTING ) {
@@ -447,17 +447,17 @@ implementation {
     call CSN.clr();
     signal CC2420Power.startOscillatorDone();
   }
- 
+
   /***************** ActiveMessageAddress Events ****************/
   async event void ActiveMessageAddress.changed() {
     atomic {
       m_short_addr = call ActiveMessageAddress.amAddress();
       m_pan = call ActiveMessageAddress.amGroup();
     }
-    
+
     post sync();
   }
-  
+
   /***************** Tasks ****************/
   /**
    * Attempt to synchronize our current settings with the CC2420
@@ -465,24 +465,24 @@ implementation {
   task void sync() {
     call CC2420Config.sync();
   }
-  
+
   task void syncDone() {
     atomic m_sync_busy = FALSE;
     signal CC2420Config.syncDone( SUCCESS );
   }
-  
-  
+
+
   /***************** Functions ****************/
   /**
    * Write teh FSCTRL register
    */
   void writeFsctrl() {
     uint8_t channel;
-    
+
     atomic {
       channel = m_channel;
     }
-    
+
     call FSCTRL.write( ( 1 << CC2420_FSCTRL_LOCK_THR ) |
           ( ( (channel - 11)*5+357 ) << CC2420_FSCTRL_FREQ ) );
   }
@@ -508,7 +508,7 @@ implementation {
     // MDMCTRL1.CORR_THR is defaulted to 20 instead of 0 like the datasheet says
     // If we add in changes to MDMCTRL1, be sure to include this fix.
   }
-  
+
   /**
    * Write the PANID register
    */
@@ -544,5 +544,5 @@ implementation {
 
   default event void ReadRssi.readDone(error_t error, uint16_t data) {
   }
-  
+
 }

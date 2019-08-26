@@ -1,6 +1,6 @@
 //$Id: SerialDispatcherP.nc,v 1.10 2010-06-29 22:07:50 scipio Exp $
 
-/* Copyright (c) 2000-2005 The Regents of the University of California.  
+/* Copyright (c) 2000-2005 The Regents of the University of California.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -69,15 +69,15 @@ implementation {
     RECV_STATE_IDLE = 0,
     RECV_STATE_BEGIN = 1,
     RECV_STATE_DATA = 2,
-  }; 
-  
+  };
+
   typedef struct {
     uint8_t which:1;
     uint8_t bufZeroLocked:1;
     uint8_t bufOneLocked:1;
     uint8_t state:2;
   } recv_state_t;
-  
+
   // We are not busy, the current buffer to use is zero,
   // neither buffer is locked, and we are idle
   recv_state_t receiveState = {0, 0, 0, RECV_STATE_IDLE};
@@ -87,7 +87,7 @@ implementation {
   /* This component provides double buffering. */
   message_t messages[2];     // buffer allocation
   message_t* ONE messagePtrs[2] = { &messages[0], &messages[1]};
-  
+
   // We store a separate receiveBuffer variable because indexing
   // into a pointer array can be costly, and handling interrupts
   // is time critical.
@@ -118,7 +118,7 @@ implementation {
       if (sendIndex > sizeof(message_header_t)) {
 	return ESIZE;
       }
-      
+
       sendError = SUCCESS;
       sendBuffer = (uint8_t*)msg;
       sendState = SEND_STATE_DATA;
@@ -154,7 +154,7 @@ implementation {
     }
   }
 
-    
+
   task void signalSendDone(){
     error_t error;
 
@@ -217,12 +217,12 @@ implementation {
       receiveState.bufZeroLocked = 0;
     }
   }
-  
+
   void receiveBufferSwap() {
     receiveState.which = (receiveState.which)? 0: 1;
     receiveBuffer = (uint8_t*)(messagePtrs[receiveState.which]);
   }
-  
+
   async event error_t ReceiveBytePacket.startPacket() {
     error_t result = SUCCESS;
     atomic {
@@ -249,7 +249,7 @@ implementation {
         recvIndex = call PacketInfo.offset[b]();
         recvType = b;
         break;
-        
+
       case RECV_STATE_DATA:
         if (recvIndex < sizeof(message_t)) {
           receiveBuffer[recvIndex] = b;
@@ -262,7 +262,7 @@ implementation {
           // CRC).
         }
         break;
-        
+
       case RECV_STATE_IDLE:
       default:
         // Do nothing. This case can be reached if the component
@@ -271,7 +271,7 @@ implementation {
       }
     }
   }
-  
+
   task void receiveTask(){
     uart_id_t myType;
     message_t *myBuf;
@@ -312,7 +312,7 @@ implementation {
     }
     if (postsignalreceive){
       post receiveTask();
-    }    
+    }
 
     // These are all local variables to release component state that
     // will allow the component to start receiving serial packets
@@ -321,7 +321,7 @@ implementation {
     // We need myWhich in case we happen to receive a whole new packet
     // before the signal returns, at which point receiveState.which
     // might revert back to us (via receiveBufferSwap()).
-    
+
 /*     uart_id_t myType;   // What is the type of the packet in flight?  */
 /*     uint8_t myWhich;  // Which buffer ptr entry is it? */
 /*     uint8_t mySize;   // How large is it? */
@@ -330,7 +330,7 @@ implementation {
     // First, copy out all of the important state so we can receive
     // the next packet. Then do a receiveBufferSwap, which will
     // tell the component to use the other available buffer.
-    // If the buffer is 
+    // If the buffer is
 /*     atomic { */
 /*       myType = recvType; */
 /*       myWhich = receiveState.which; */
@@ -377,5 +377,5 @@ implementation {
     return;
   }
 
-  
+
 }
