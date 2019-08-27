@@ -1,2 +1,0 @@
-PFLAGS := -I$(TINYOS_OS_DIR)/platforms/nxp_jn516/plain154 \
-	$(PFLAGS)
