@@ -67,6 +67,8 @@ implementation {
 
   error_t sendErr = SUCCESS;
 
+  bool isTransmitter = FALSE;
+
   /** TRUE if we are to use CCA when sending the current packet */
   norace bool ccaOn;
 
@@ -124,7 +126,7 @@ implementation {
     cc2420_header_t* header = call CC2420PacketBody.getHeader( p_msg );
     cc2420_metadata_t* metadata = call CC2420PacketBody.getMetadata( p_msg );
 
-    if (call Resource.immediateRequest() == SUCCESS) {
+    if (isTransmitter && call Resource.immediateRequest() == SUCCESS) {
       call CC2420Power.rxOn();
       call Resource.release();
     }
@@ -257,7 +259,7 @@ implementation {
       call SplitControlState.forceState(S_STARTED);
     }
 
-    if (call Resource.immediateRequest() == SUCCESS) {
+    if (isTransmitter && call Resource.immediateRequest() == SUCCESS) {
       call CC2420Power.rfOff();
       call Resource.release();
     }
@@ -268,7 +270,11 @@ implementation {
   task void startDone_task() {
     call SubControl.start();
 
-    if (TOS_NODE_ID != CONTROLLER_TX_NODE_ID && TOS_NODE_ID != PLANT_TX_NODE_ID) {
+    if (TOS_NODE_ID == CONTROLLER_TX_NODE_ID || TOS_NODE_ID == PLANT_TX_NODE_ID) {
+      isTransmitter = TRUE;
+    }
+
+    if (!isTransmitter) {
       call CC2420Power.rxOn();
     }
 

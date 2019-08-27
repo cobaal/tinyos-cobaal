@@ -214,8 +214,8 @@ implementation
     if (sendcount > 190)
       call Leds.led1Toggle();
 } */
-    /* printf("test");
-    printfflush(); */
+    printf("test");
+    printfflush();
 
     atomic
       if (!radioFull) {
