@@ -45,11 +45,11 @@ configuration CC2420ControlC {
   provides interface CC2420Config;
   provides interface CC2420Power;
   provides interface Read<uint16_t> as ReadRssi;
-  
+
 }
 
 implementation {
-  
+
   components CC2420ControlP;
   Resource = CC2420ControlP;
   CC2420Config = CC2420ControlP;
@@ -58,7 +58,7 @@ implementation {
 
   components MainC;
   MainC.SoftwareInit -> CC2420ControlP;
-  
+
   components AlarmMultiplexC as Alarm;
   CC2420ControlP.StartupTimer -> Alarm;
 
@@ -92,7 +92,7 @@ implementation {
 
   components new CC2420SpiC() as RssiResource;
   CC2420ControlP.RssiResource -> RssiResource;
-  
+
   components ActiveMessageAddressC;
   CC2420ControlP.ActiveMessageAddress -> ActiveMessageAddressC;
 
@@ -100,4 +100,3 @@ implementation {
   CC2420ControlP.LocalIeeeEui64 -> LocalIeeeEui64C;
 
 }
-

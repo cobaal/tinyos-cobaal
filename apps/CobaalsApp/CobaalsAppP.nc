@@ -132,8 +132,8 @@ implementation
 
     } else {
       // Radio to Radio
-      /* printf("[%d] %u\r\n", receivecount++, cobaalMsg->sequence);
-      printfflush(); */
+      printf("[%d] %u\r\n", receivecount++, cobaalMsg->sequence);
+      printfflush();
 
       atomic
         if (!radioFull) {
@@ -209,13 +209,9 @@ implementation
 						   void *payload,
 						   uint8_t len) {
     message_t *ret = msg;
-    /* atomic {
-    sendcount++;
-    if (sendcount > 190)
-      call Leds.led1Toggle();
-} */
-    printf("test");
-    printfflush();
+
+    /* printf("test");
+    printfflush(); */
 
     atomic
       if (!radioFull) {

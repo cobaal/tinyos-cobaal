@@ -126,9 +126,11 @@ implementation {
     cc2420_header_t* header = call CC2420PacketBody.getHeader( p_msg );
     cc2420_metadata_t* metadata = call CC2420PacketBody.getMetadata( p_msg );
 
-    if (isTransmitter && call Resource.immediateRequest() == SUCCESS) {
-      call CC2420Power.rxOn();
-      call Resource.release();
+    atomic {
+      if (isTransmitter && call Resource.immediateRequest() == SUCCESS) {
+        call CC2420Power.rxOn();
+        call Resource.release();
+      }
     }
 
     atomic {
@@ -259,9 +261,11 @@ implementation {
       call SplitControlState.forceState(S_STARTED);
     }
 
-    if (isTransmitter && call Resource.immediateRequest() == SUCCESS) {
-      call CC2420Power.rfOff();
-      call Resource.release();
+    atomic {
+      if (isTransmitter && call Resource.immediateRequest() == SUCCESS) {
+        call CC2420Power.rfOff();
+        call Resource.release();
+      }
     }
 
     signal Send.sendDone( m_msg, packetErr );
